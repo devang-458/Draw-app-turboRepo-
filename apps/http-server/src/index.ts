@@ -1,10 +1,15 @@
 import express from "express";
 import cors from "cors";
-import { CreateUserSchema, SigninSchema } from "@repo/common/types";
-import { prisma } from "@repo/db";
+import {
+  CreateRoomSchema,
+  CreateUserSchema,
+  SigninSchema,
+} from "@repo/common/types";
+import { prismaClient} from "@repo/db/client";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "@repo/backend-common/config";
+import { middleware } from "./middleware";
 
 const app = express();
 const SALT_ROUNDS = 10;
@@ -29,7 +34,7 @@ app.post("/signup", async (req, res) => {
   try {
     const { username, password, name } = parsedData.data;
 
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await prismaClient.user.findUnique({
       where: { email: username },
     });
 
@@ -39,7 +44,7 @@ app.post("/signup", async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
-    const newUser = await prisma.user.create({
+    const newUser = await prismaClient.user.create({
       data: {
         email: username,
         password: hashedPassword,
@@ -66,7 +71,7 @@ app.post("/signin", async (req, res) => {
 
   try {
     const { username, password } = parsedData.data;
-    const user = await prisma.user.findFirst({
+    const user = await prismaClient.user.findFirst({
       where: {
         email: username,
       },
@@ -107,8 +112,35 @@ app.post("/signin", async (req, res) => {
   }
 });
 
-app.post("/room", (req, res) => {});
+app.post("/room", middleware, async (req, res) => {
+  const parsedData = CreateRoomSchema.safeParse(req.body);
+  if (!parsedData.success) {
+    res.json({
+      message: "Incorrect input",
+    });
+    return;
+  }
 
+  //@ts-ignore
+  const userId = req.userId;
+
+  try {
+    const room = await prismaClient.room.create({
+      data: {
+        slug: parsedData.data.name,
+        adminId: userId,
+      },
+    });
+
+    res.json({
+      roomId: room.id,
+    });
+  } catch (e) {
+    res.status(411).json({
+      message: "Room already exists with this name",
+    });
+  }
+});
 app.listen(3002, () => {
   console.log("server is running");
 });
