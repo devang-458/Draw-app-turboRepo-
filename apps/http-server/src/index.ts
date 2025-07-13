@@ -5,7 +5,7 @@ import {
   CreateUserSchema,
   SigninSchema,
 } from "@repo/common/types";
-import { prismaClient} from "@repo/db/client";
+import { prismaClient } from "@repo/db/client";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "@repo/backend-common/config";
@@ -14,7 +14,13 @@ import { middleware } from "./middleware";
 const app = express();
 const SALT_ROUNDS = 10;
 
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:3001",
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
 app.get("/", (req, res) => {
@@ -77,6 +83,8 @@ app.post("/signin", async (req, res) => {
       },
     });
 
+    console.log(user);
+
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -99,7 +107,7 @@ app.post("/signin", async (req, res) => {
       }
     );
 
-    return res.status(401).json({
+    return res.status(200).json({
       token: token,
       user: {
         id: user.id,
@@ -142,22 +150,22 @@ app.post("/room", middleware, async (req, res) => {
   }
 });
 
-app.get("/chats/:roomId", async (req,res)=>{
+app.get("/chats/:roomId", async (req, res) => {
   const roomId = Number(req.params.roomId);
   const messages = await prismaClient.chat.findMany({
     where: {
-      roomId: roomId
+      roomId: roomId,
     },
     orderBy: {
-      id: "desc"
+      id: "desc",
     },
-    take: 50
-  })
+    take: 50,
+  });
 
   res.json({
-    messages
-  })
-})
+    messages,
+  });
+});
 
 app.listen(3002, () => {
   console.log("server is running");
